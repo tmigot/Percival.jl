@@ -27,13 +27,13 @@ In addition to keeping `meta` and `counters` as any NLPModel, an AugLagModel als
 
 Use the functions `update_cx!`, `update_y!` and `update_μ!` to update these values.
 """
-mutable struct AugLagModel{M <: AbstractNLPModel, T <: AbstractFloat, V <: AbstractVector} <:
+struct AugLagModel{M <: AbstractNLPModel, T <: AbstractFloat, V <: AbstractVector} <:
                AbstractNLPModel{T, V}
   meta::NLPModelMeta{T, V}
   counters::Counters
   model::M
   y::V
-  μ::T
+  μ::V
   x::V # save last iteration of subsolver
   cx::V # save last constraint value of subsolver
   μc_y::V # y - μ * cx
@@ -54,7 +54,7 @@ function AugLagModel(model::AbstractNLPModel{T, V}, y::V, μ::T, x::V, cx::V) wh
     Counters(),
     model,
     y,
-    μ,
+    [μ],
     x,
     cx,
     y - μ * cx,
@@ -75,7 +75,7 @@ function update_cx!(nlp::AugLagModel, x::AbstractVector)
     cons!(nlp.model, x, nlp.cx)
     nlp.cx .-= nlp.model.meta.lcon
     nlp.x .= x
-    nlp.μc_y .= nlp.μ .* nlp.cx .- nlp.y
+    nlp.μc_y .= nlp.μ[1] .* nlp.cx .- nlp.y
   end
 end
 
@@ -91,7 +91,7 @@ function update_fxcx!(nlp::AugLagModel, x::AbstractVector)
     fx, _ = objcons!(nlp.model, x, nlp.cx)
     nlp.cx .-= nlp.model.meta.lcon
     nlp.x .= x
-    nlp.μc_y .= nlp.μ .* nlp.cx .- nlp.y
+    nlp.μc_y .= nlp.μ[1] .* nlp.cx .- nlp.y
   else
     fx = obj(nlp.model, x)
   end
@@ -105,7 +105,7 @@ Given an `AugLagModel`, update `nlp.y = -nlp.μc_y` and updates `nlp.μc_y` acco
 """
 function update_y!(nlp::AugLagModel)
   nlp.y .= -nlp.μc_y
-  nlp.μc_y .= nlp.μ .* nlp.cx .- nlp.y
+  nlp.μc_y .= nlp.μ[1] .* nlp.cx .- nlp.y
 end
 
 """
@@ -114,15 +114,15 @@ end
 Given an `AugLagModel`, updates `nlp.μ = μ` and `nlp.μc_y` accordingly.
 """
 function update_μ!(nlp::AugLagModel, μ::AbstractFloat)
-  nlp.μ = μ
-  nlp.μc_y .= nlp.μ .* nlp.cx .- nlp.y
+  nlp.μ .= [μ]
+  nlp.μc_y .= nlp.μ[1] .* nlp.cx .- nlp.y
 end
 
 function NLPModels.obj(nlp::AugLagModel, x::AbstractVector)
   @lencheck nlp.meta.nvar x
   increment!(nlp, :neval_obj)
   fx = update_fxcx!(nlp, x)
-  return fx - dot(nlp.y, nlp.cx) + (nlp.μ / 2) * dot(nlp.cx, nlp.cx)
+  return fx - dot(nlp.y, nlp.cx) + (nlp.μ[1] / 2) * dot(nlp.cx, nlp.cx)
 end
 
 function NLPModels.grad!(nlp::AugLagModel, x::AbstractVector, g::AbstractVector)
@@ -141,7 +141,7 @@ function NLPModels.objgrad!(nlp::AugLagModel, x::AbstractVector, g::AbstractVect
   increment!(nlp, :neval_obj)
   increment!(nlp, :neval_grad)
   fx = update_fxcx!(nlp, x)
-  f = fx - dot(nlp.y, nlp.cx) + (nlp.μ / 2) * dot(nlp.cx, nlp.cx)
+  f = fx - dot(nlp.y, nlp.cx) + (nlp.μ[1] / 2) * dot(nlp.cx, nlp.cx)
   grad!(nlp.model, x, g)
   g .+= jtprod!(nlp.model, x, nlp.μc_y, nlp.store_Jtv)
   return f, g
@@ -162,6 +162,6 @@ function NLPModels.hprod!(
   jprod!(nlp.model, x, v, nlp.store_Jv)
   jtprod!(nlp.model, x, nlp.store_Jv, nlp.store_Jtv)
   hprod!(nlp.model, x, nlp.μc_y, v, Hv, obj_weight = obj_weight)
-  Hv .+= nlp.μ * nlp.store_Jtv
+  Hv .+= nlp.μ[1] * nlp.store_Jtv
   return Hv
 end

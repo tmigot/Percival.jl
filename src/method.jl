@@ -139,7 +139,7 @@ function percival(
     [:iter, :fx, :normgp, :normcx, :μ, :normy, :sumc, :inner_status, :iter_type],
     [Int, Float64, Float64, Float64, Float64, Float64, Int, Symbol, Symbol],
   )
-  @info log_row(Any[iter, fx, normgp, normcx, al_nlp.μ, norm(y), counter_cost(nlp)])
+  @info log_row(Any[iter, fx, normgp, normcx, al_nlp.μ[1], norm(y), counter_cost(nlp)])
 
   solved = normgp ≤ ϵd && normcx ≤ ϵp
   infeasible = false
@@ -162,17 +162,17 @@ function percival(
     inner_status = S.status
 
     normcx = norm(al_nlp.cx)
-    fx = S.objective + dot(al_nlp.y, al_nlp.cx) - normcx^2 * al_nlp.μ / 2
+    fx = S.objective + dot(al_nlp.y, al_nlp.cx) - normcx^2 * al_nlp.μ[1] / 2
 
     iter_type = if normcx <= η
       update_y!(al_nlp)
-      η = max(η / al_nlp.μ^T(0.9), ϵp)
-      ω /= al_nlp.μ
+      η = max(η / al_nlp.μ[1]^T(0.9), ϵp)
+      ω /= al_nlp.μ[1]
       :update_y
     else
-      update_μ!(al_nlp, 10 * al_nlp.μ)
-      η = max(1 / al_nlp.μ^T(0.1), ϵp)
-      ω = 1 / al_nlp.μ
+      update_μ!(al_nlp, 10 * al_nlp.μ[1])
+      η = max(1 / al_nlp.μ[1]^T(0.1), ϵp)
+      ω = 1 / al_nlp.μ[1]
       :update_μ
     end
 
@@ -185,11 +185,11 @@ function percival(
     el_time = time() - start_time
     rem_eval = max_eval - neval_obj(nlp)
     solved = normgp ≤ ϵd && normcx ≤ ϵp
-    infeasible = al_nlp.μ > 1e16 && norm(jtprod(nlp, al_nlp.x, al_nlp.cx)) < √ϵp * normcx
-    tired = iter > max_iter || el_time > max_time || neval_obj(nlp) > max_eval || al_nlp.μ > 1e16
+    infeasible = al_nlp.μ[1] > 1e16 && norm(jtprod(nlp, al_nlp.x, al_nlp.cx)) < √ϵp * normcx
+    tired = iter > max_iter || el_time > max_time || neval_obj(nlp) > max_eval || al_nlp.μ[1] > 1e16
 
     @info log_row(
-      Any[iter, fx, normgp, normcx, al_nlp.μ, norm(y), counter_cost(nlp), inner_status, iter_type],
+      Any[iter, fx, normgp, normcx, al_nlp.μ[1], norm(y), counter_cost(nlp), inner_status, iter_type],
     )
   end
 
@@ -204,7 +204,7 @@ function percival(
       status = :max_time
     elseif neval_obj(nlp) > max_eval
       status = :max_eval
-    elseif al_nlp.μ > 1e16
+    elseif al_nlp.μ[1] > 1e16
       status = :stalled
     end
   end
