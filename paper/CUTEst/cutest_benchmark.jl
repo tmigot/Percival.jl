@@ -7,11 +7,11 @@ using CUTEst
 using NLPModels, NLPModelsIpopt, Percival, SolverBenchmark
 
 nmax = 10000
-problems = readlines(joinpath(@__DIR__, "list_problems_$nmax.dat"))
+problems = readlines(joinpath(@__DIR__, "list_problems_$(nmax)_wth.dat")) # skip LUKVLI7
 cutest_problems = (CUTEstModel(p) for p in problems)
 
 max_time = 1200.0 #20 minutes
-tol = 1e-5
+tol = 1e-3
 
 # Percival parameters
 # My logic is:
@@ -27,9 +27,9 @@ params = Dict(
 :inity => false, # default: false
 :η₀ => 0.5, # default: 0.5 Starting value for the contraints tolerance of the subproblem
 :ω₀ => 1.0,  # default: 1 Starting value for relative tolerance of the subproblem;
-:ω_min => sqrt(eps()), #default: atol
+:ω_min => sqrt(eps()), #default: sqrt(eps(T))
 :α₁ => 0.9,  # default: 0.9 ``η = max(η / al_nlp.μ^α₁, ϵp)`` if ``‖c(xᵏ)‖ ≤ η``;
-:β₀ => 0.1, # default: 1
+:β₀ => 1.0, # default: 1
 :β₁ => 0.1, # default: 0.1 ``η = max(1 / al_nlp.μ^β₁, ϵp)`` if ``‖c(xᵏ)‖ > η``;
 :subsolver_max_iter => typemax(Int),
 # TRON args
@@ -44,14 +44,15 @@ params = Dict(
 :μ₀ => 1e-2, #μ₀::T = T(1e-2): algorithm parameter in (0, 0.5).
 :μ₁ => 1.0, #μ₁::T = one(T): algorithm parameter in (0, +∞).
 :σ => 10.0, #σ::T = T(10)`: algorithm parameter in (1, +∞).
-:verbose => 1,
-:subsolver_verbose => 1,
+:verbose => 0,
+:subsolver_verbose => 0,
 )
 
 solvers = Dict(
   :ipopt => nlp -> ipopt(
       nlp,
       print_level = 0,
+      nlp_scaling_method = :none,
       dual_inf_tol = Inf,
       constr_viol_tol = Inf,
       compl_inf_tol = Inf,
